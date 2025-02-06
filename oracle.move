@@ -3,15 +3,13 @@ module futarchy::oracle {
 
     // ========== Constants =========
     const BASIS_POINTS: u64 = 10_000;
+    const TWAP_PRICE_CAP_WINDOW_PERIOD: u64 = 60_000; // 60 seconds in milliseconds 
 
     // ======== Error Constants ========
     const ETIMESTAMP_REGRESSION: u64 = 0;
     const E_TWAP_NOT_STARTED: u64 = 1;
     const EZERO_PERIOD: u64 = 2;
     const EZERO_PRICE: u64 = 3;
-
-    // ======== Default Constants ========
-    const TWAP_PRICE_CAP_WINDOW_PERIOD: u64 = 60_000; // 60 seconds in milliseconds 
     
     // ======== Configuration Struct ========
     public struct Oracle has key, store {
