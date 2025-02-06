@@ -2,7 +2,7 @@ module futarchy::oracle {
     use sui::clock::{Self, Clock};
 
     // ========== Constants =========
-    const BASIS_POINTS: u64 = 10_000;
+    const PRECISION_MULTIPLIER: u64 = 10_000;
     const TWAP_PRICE_CAP_WINDOW_PERIOD: u64 = 60_000; // 60 seconds in milliseconds 
 
     // ======== Error Constants ========
@@ -58,7 +58,7 @@ module futarchy::oracle {
         let steps = full_windows_since_last_update + 1;
 
         // Using % change consider switching to absolute change in terms of asset units
-        let max_change = (twap_base * max_step * steps) / BASIS_POINTS;
+        let max_change = (twap_base * max_step * steps) / PRECISION_MULTIPLIER;
         let result = if (new_price > twap_base) {
             // Cap upward movement
             if (new_price - twap_base > max_change) {
@@ -172,7 +172,7 @@ module futarchy::oracle {
         assert!(period > 0, EZERO_PERIOD);
         
         // Calculate and validate TWAP
-        let twap = (oracle.total_cumulative_price * (BASIS_POINTS as u128)) / (period as u128);
+        let twap = (oracle.total_cumulative_price * (PRECISION_MULTIPLIER as u128)) / (period as u128);
         
         (twap as u64)
     }
