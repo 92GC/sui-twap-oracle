@@ -3,7 +3,7 @@ module futarchy::oracle {
 
     // ========== Constants =========
     const PRECISION_MULTIPLIER: u64 = 10_000;
-    const TWAP_PRICE_CAP_WINDOW_PERIOD: u64 = 60_000; // 60 seconds in milliseconds 
+    const TWAP_PRICE_CAP_WINDOW: u64 = 60_000; // 60 seconds in milliseconds 
 
     // ======== Error Constants ========
     const ETIMESTAMP_REGRESSION: u64 = 0;
@@ -81,7 +81,7 @@ module futarchy::oracle {
     fun calculate_window_twap(oracle: &Oracle, full_windows_since_last_update: u64): u64 {
         let current_window_price_accumulation = oracle.total_cumulative_price - oracle.last_window_end_cumulative_price;
 
-        let time_elapsed = (TWAP_PRICE_CAP_WINDOW_PERIOD as u128) * (full_windows_since_last_update as u128);
+        let time_elapsed = (TWAP_PRICE_CAP_WINDOW as u128) * (full_windows_since_last_update as u128);
         let current_window_price_sum = current_window_price_accumulation / time_elapsed;
         (current_window_price_sum as u64)
     }
@@ -120,9 +120,9 @@ module futarchy::oracle {
             if (additional_time_to_include > 0) {
 
                 // Only update TWAP cap if entering a new window
-                if (timestamp - oracle.last_window_end >= TWAP_PRICE_CAP_WINDOW_PERIOD) {
+                if (timestamp - oracle.last_window_end >= TWAP_PRICE_CAP_WINDOW) {
                     
-                    let full_windows_since_last_update = (((timestamp - oracle.last_window_end) as u128) / (TWAP_PRICE_CAP_WINDOW_PERIOD as u128)) as u64;
+                    let full_windows_since_last_update = (((timestamp - oracle.last_window_end) as u128) / (TWAP_PRICE_CAP_WINDOW as u128)) as u64;
 
                     // If multiple windows have passed, cap should all greater range of values
                     let capped_price = cap_price_change(oracle.last_window_twap, price, oracle.twap_step_max, full_windows_since_last_update);
@@ -134,7 +134,7 @@ module futarchy::oracle {
                     // Add accumulation for current and previous windows 
                     oracle.last_window_twap = calculate_window_twap(oracle, full_windows_since_last_update);
                     oracle.last_window_end_cumulative_price = oracle.total_cumulative_price;
-                    oracle.last_window_end = oracle.last_window_end + TWAP_PRICE_CAP_WINDOW_PERIOD * full_windows_since_last_update;
+                    oracle.last_window_end = oracle.last_window_end + TWAP_PRICE_CAP_WINDOW * full_windows_since_last_update;
                     
                     oracle.last_price = capped_price;
 
