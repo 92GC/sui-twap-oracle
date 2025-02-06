@@ -87,6 +87,7 @@ module futarchy::oracle {
     }
 
     // ======== Core Functions ========
+    // Called before swaps, LP events and before reading TWAP
     public(package) fun write_observation(
         oracle: &mut Oracle,
         timestamp: u64,
