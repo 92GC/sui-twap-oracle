@@ -157,7 +157,7 @@ module futarchy::oracle {
         }
     }
 
-    // TWAP can only be read in same instance after a write
+    // TWAP is only be read in same instance, after a write
     // So no logic is needed to extrapolate TWAP for last write to current timestamp
     public(package) fun get_twap(oracle: &Oracle, clock: &Clock): u64 {
         let current_time = clock::timestamp_ms(clock);
