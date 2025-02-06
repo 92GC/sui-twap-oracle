@@ -166,7 +166,6 @@ module futarchy::oracle {
         }
     }
 
-
     // TWAP can only be read in same instance after a write
     // So no logic is needed to extrapolate TWAP
     public(package) fun get_twap(oracle: &Oracle, clock: &Clock): u64 {
