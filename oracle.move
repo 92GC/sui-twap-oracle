@@ -1,6 +1,5 @@
 module futarchy::oracle {
     use sui::clock::{Self, Clock};
-    use std::debug;
 
     // ========== Constants =========
     const BASIS_POINTS: u64 = 10_000;
