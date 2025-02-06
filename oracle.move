@@ -63,9 +63,11 @@ module futarchy::oracle {
         }
 
     // ======== Helper Functions ========
-    fun cap_price_change(twap_base: u64, new_price: u64, max_step: u64, basis_points: u64, full_windows_since_last_update: u64): u64 {
-        // Basis points can't be 0, so this is safe, see calculate_decimal_scale_factor in maths module
+    fun cap_price_change(twap_base: u64, new_price: u64, max_step: u64, full_windows_since_last_update: u64): u64 {
+        // Basis points can't be 0, see calculate_decimal_scale_factor in maths module
         let steps = full_windows_since_last_update + 1;
+
+        // Using % change consider switching to absolute change in terms of asset units
         let max_change = (twap_base * max_step * steps) / BASIS_POINTS;
         let result = if (new_price > twap_base) {
             // Cap upward movement
@@ -126,13 +128,13 @@ module futarchy::oracle {
             // Avoid multiplying by 0
             if (additional_time_to_include > 0) {
 
-                // Only update TWAP cap after a whole interval has passed
+                // Only update TWAP cap if entering a new window
                 if (timestamp - oracle.last_window_end >= TWAP_PRICE_CAP_WINDOW_PERIOD) {
                     
-                    let full_windows_since_last_update = ( (timestamp - oracle.last_window_end as u128) /  (TWAP_PRICE_CAP_WINDOW_PERIOD as u128) as u64);
+                    let full_windows_since_last_update = (((timestamp - oracle.last_window_end) as u128) / (TWAP_PRICE_CAP_WINDOW_PERIOD as u128)) as u64;
 
                     // If multiple windows have passed, cap should all greater range of values
-                    let capped_price = cap_price_change(oracle.last_window_twap, price, oracle.twap_step_max, oracle.basis_points, full_windows_since_last_update);
+                    let capped_price = cap_price_change(oracle.last_window_twap, price, oracle.twap_step_max, full_windows_since_last_update);
                     
                     let scaled_price = (capped_price as u128);
                     let price_contribution = scaled_price * (additional_time_to_include as u128);
@@ -144,10 +146,12 @@ module futarchy::oracle {
                     oracle.last_window_end = oracle.last_window_end + TWAP_PRICE_CAP_WINDOW_PERIOD * full_windows_since_last_update;
                     
                     oracle.last_price = capped_price;
+
+                // When not entering a new window
                 } else {
 
                     let full_windows_since_last_update = 0;
-                    let capped_price = cap_price_change(oracle.last_window_twap, price, oracle.twap_step_max, oracle.basis_points, full_windows_since_last_update);
+                    let capped_price = cap_price_change(oracle.last_window_twap, price, oracle.twap_step_max, full_windows_since_last_update);
 
                     // Add accumulation for current window
                     let scaled_price = (capped_price as u128);
