@@ -78,7 +78,6 @@ module futarchy::oracle {
         result
     }
 
-    // Calculate TWAP for the just-completed window
     fun calculate_window_twap(oracle: &Oracle, full_windows_since_last_update: u64): u64 {
         let current_window_price_accumulation = oracle.total_cumulative_price - oracle.last_window_end_cumulative_price;
 
@@ -131,7 +130,7 @@ module futarchy::oracle {
                     let price_contribution = scaled_price * (additional_time_to_include as u128);
                     oracle.total_cumulative_price = oracle.total_cumulative_price + price_contribution;
 
-                    // Add accumulation for current and previous windows
+                    // Add accumulation for current and previous windows 
                     oracle.last_window_twap = calculate_window_twap(oracle, full_windows_since_last_update);
                     oracle.last_window_end_cumulative_price = oracle.total_cumulative_price;
                     oracle.last_window_end = oracle.last_window_end + TWAP_PRICE_CAP_WINDOW_PERIOD * full_windows_since_last_update;
