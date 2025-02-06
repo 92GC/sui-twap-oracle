@@ -25,7 +25,6 @@ module futarchy::oracle {
         twap_step_max: u64,  // Maximum relative step size for TWAP calculations
         market_start_time: u64,
         twap_initialization_price: u64
-        
     }
 
     // ======== Constructor ========
