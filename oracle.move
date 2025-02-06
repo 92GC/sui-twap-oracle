@@ -14,18 +14,15 @@ module futarchy::oracle {
     // ======== Configuration Struct ========
     public struct Oracle has key, store {
         id: UID,
-        // Price tracking
         last_price: u64,
         last_timestamp: u64,
-        
         // TWAP calculation fields - using u128 for overflow protection
         total_cumulative_price: u128,
-        last_window_end: u64,
         last_window_end_cumulative_price: u128,
+        last_window_end: u64,
         last_window_twap: u64,
-
-        twap_start_delay: u64,
-        twap_step_max: u64,  // Maximum step size for TWAP calculations
+        twap_start_delay: u64, // Reduces attacker advantage with surprise proposals
+        twap_step_max: u64,  // Maximum relative step size for TWAP calculations
         market_start_time: u64,
         twap_initialization_price: u64
         
@@ -44,8 +41,8 @@ module futarchy::oracle {
                 last_price: twap_initialization_price,
                 last_timestamp: market_start_time,
                 total_cumulative_price: 0,
-                last_window_end: 0,
                 last_window_end_cumulative_price: 0,
+                last_window_end: 0,
                 last_window_twap: twap_initialization_price,
                 twap_start_delay: twap_start_delay,
                 twap_step_max: twap_step_max,
