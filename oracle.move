@@ -27,7 +27,6 @@ module futarchy::oracle {
         last_window_end_cumulative_price: u128,
         last_window_twap: u64,
 
-        basis_points: u64,
         twap_start_delay: u64,
         twap_step_max: u64,  // Maximum step size for TWAP calculations
         market_start_time: u64,
@@ -39,7 +38,6 @@ module futarchy::oracle {
     public(package) fun new_oracle(
             twap_initialization_price: u64,
             market_start_time: u64,
-            basis_points: u64,
             twap_start_delay: u64,
             twap_step_max: u64,
             ctx: &mut TxContext
@@ -52,7 +50,6 @@ module futarchy::oracle {
                 last_window_end: 0,
                 last_window_end_cumulative_price: 0,
                 last_window_twap: twap_initialization_price,
-                basis_points: basis_points,
                 twap_start_delay: twap_start_delay,
                 twap_step_max: twap_step_max,
                 market_start_time: market_start_time,
@@ -125,7 +122,8 @@ module futarchy::oracle {
 
             let additional_time_to_include = timestamp - oracle.last_timestamp;
 
-            // Avoid multiplying by 0
+            // Avoid multiplying by 0 time. This check means that the first get_twap() caller or trader 
+            // in each milisecond clock step is the only one that can impact the oracle accumulation
             if (additional_time_to_include > 0) {
 
                 // Only update TWAP cap if entering a new window
@@ -167,7 +165,7 @@ module futarchy::oracle {
     }
 
     // TWAP can only be read in same instance after a write
-    // So no logic is needed to extrapolate TWAP
+    // So no logic is needed to extrapolate TWAP for last write to current timestamp
     public(package) fun get_twap(oracle: &Oracle, clock: &Clock): u64 {
         let current_time = clock::timestamp_ms(clock);
         
@@ -181,7 +179,7 @@ module futarchy::oracle {
         assert!(period > 0, EZERO_PERIOD);
         
         // Calculate and validate TWAP
-        let twap = (oracle.total_cumulative_price * (oracle.basis_points as u128)) / (period as u128);
+        let twap = (oracle.total_cumulative_price * (BASIS_POINTS as u128)) / (period as u128);
         
         (twap as u64)
     }
