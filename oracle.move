@@ -53,7 +53,7 @@ module futarchy::oracle {
     }
 
     // ======== Helper Functions ========
-    // Cap TWAP accumualation price against previous windows to stop an attacker moving it quickly
+    // Cap TWAP accumulation price against previous windows to stop an attacker moving it quickly
     fun cap_price_change(twap_base: u64, new_price: u64, max_step: u64, full_windows_since_last_update: u64): u64 {
         // Basis points can't be 0, see calculate_decimal_scale_factor in maths module
         let steps = full_windows_since_last_update + 1;
@@ -120,7 +120,7 @@ module futarchy::oracle {
             let additional_time_to_include = timestamp - oracle.last_timestamp;
 
             // Avoid multiplying by 0 time. This check means that the first get_twap() caller or trader 
-            // in each milisecond clock step is the only one that can impact the oracle accumulation
+            // in each millisecond clock step is the only one that can impact the oracle accumulation
             if (additional_time_to_include > 0) {
 
                 // Only update TWAP cap if entering a new window
@@ -128,7 +128,7 @@ module futarchy::oracle {
                     
                     let full_windows_since_last_update = ((timestamp - oracle.last_window_end) as u128) / (TWAP_PRICE_CAP_WINDOW as u128);
 
-                    // If multiple windows have passed, cap should all greater range of values
+                    // If multiple windows have passed, cap allows a greater range of values
                     let capped_price = cap_price_change(oracle.last_window_twap, price, oracle.twap_step_max, ( full_windows_since_last_update as u64));
                     
                     let scaled_price = (capped_price as u128);
