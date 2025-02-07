@@ -20,8 +20,7 @@ module futarchy::oracle {
         id: UID,
         last_price: u64,
         last_timestamp: u64,
-        // TWAP calculation fields - using u256 for overflow protection
-        total_cumulative_price: u256,
+        total_cumulative_price: u256, // TWAP calculation fields - using u256 for overflow protection
         last_window_end_cumulative_price: u256,
         last_window_end: u64,
         last_window_twap: u64,
@@ -42,6 +41,7 @@ module futarchy::oracle {
         assert!(twap_initialization_price > 0, EZERO_INITIALIZATION);
         assert!(max_bps_per_step > 0, EZERO_STEP);
         assert!(twap_start_delay < 604_800_000, ELONG_DELAY); // One week in milliseconds
+        
         let oracle = Oracle {
             id: object::new(ctx), // Create a unique ID for the oracle
             last_price: twap_initialization_price,
