@@ -78,14 +78,14 @@ module futarchy::oracle {
             } else {
                 new_price
             }
-
-        // Cap downward movement
-        } else {
-            if (twap_base - new_price > max_change) {
-                twap_base - max_change
+            
+            // Cap downward movement
             } else {
-                new_price
-            }
+                if (twap_base - new_price > max_change) {
+                    twap_base - max_change
+                } else {
+                    new_price
+                }
         };
 
         result
