@@ -70,16 +70,17 @@ module futarchy::oracle {
         let computed = (twap_base * max_bps_per_step * steps) / BASIS_POINTS;
         // Ensure cap is not 0
         let max_change = if (computed < 1) { 1 } else { computed };
-
+        
+        // Cap upward movement
         let result = if (new_price > twap_base) {
-            // Cap upward movement
             if (new_price - twap_base > max_change) {
                 twap_base + max_change
             } else {
                 new_price
             }
+
+        // Cap downward movement
         } else {
-            // Cap downward movement
             if (twap_base - new_price > max_change) {
                 twap_base - max_change
             } else {
