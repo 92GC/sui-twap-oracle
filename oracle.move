@@ -7,9 +7,13 @@ module futarchy::oracle {
 
     // ======== Error Constants ========
     const ETIMESTAMP_REGRESSION: u64 = 0;
-    const E_TWAP_NOT_STARTED: u64 = 1;
+    const ETWAP_NOT_STARTED: u64 = 1;
     const EZERO_PERIOD: u64 = 2;
     const EZERO_PRICE: u64 = 3;
+    const EZERO_INITIALIZATION: u64 = 4;
+    const EZERO_STEP: u64 = 5;
+    const ELONG_DELAY: u64 = 6;
+    const ESTALE_TWAP: u64 = 7;
     
     // ======== Configuration Struct ========
     public struct Oracle has key, store {
@@ -35,9 +39,9 @@ module futarchy::oracle {
         max_bps_per_step: u64,
         ctx: &mut TxContext
     ): Oracle {
-        assert!(twap_initialization_price > 0);
-        assert!(max_bps_per_step > 0);
-        assert!(twap_start_delay < 604_800_000); // One week in milliseconds
+        assert!(twap_initialization_price > 0, EZERO_INITIALIZATION);
+        assert!(max_bps_per_step > 0, EZERO_STEP);
+        assert!(twap_start_delay < 604_800_000, ELONG_DELAY); // One week in milliseconds
         let oracle = Oracle {
             id: object::new(ctx), // Create a unique ID for the oracle
             last_price: twap_initialization_price,
@@ -165,14 +169,18 @@ module futarchy::oracle {
         }
     }
 
-    // TWAP is only be read in same instance, after a write
-    // So no logic is needed to extrapolate TWAP for last write to current timestamp
+
     public(package) fun get_twap(oracle: &Oracle, clock: &Clock): u64 {
         let current_time = clock::timestamp_ms(clock);
+
+        // TWAP is only be read in same instance, after a write
+        // So no logic is needed to extrapolate TWAP for last write to current timestamp
+        // Check reading in same intance as last write
+        assert!(current_time == oracle.last_timestamp, ESTALE_TWAP);
         
         // Time checks
         assert!(oracle.last_timestamp != 0, ETIMESTAMP_REGRESSION);
-        assert!(current_time - oracle.market_start_time >= oracle.twap_start_delay, E_TWAP_NOT_STARTED);
+        assert!(current_time - oracle.market_start_time >= oracle.twap_start_delay, ETWAP_NOT_STARTED);
         assert!(current_time >= oracle.market_start_time, ETIMESTAMP_REGRESSION);
         
         // Calculate period
