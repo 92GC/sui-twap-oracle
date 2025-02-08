@@ -170,7 +170,6 @@ module futarchy::oracle {
         }
     }
 
-
     public(package) fun get_twap(oracle: &Oracle, clock: &Clock): u64 {
         let current_time = clock::timestamp_ms(clock);
 
