@@ -110,9 +110,6 @@ module futarchy::oracle {
         // Sanity time checks
         assert!(timestamp >= oracle.last_timestamp, ETIMESTAMP_REGRESSION);
 
-        // Sanity price checks
-        assert!(price > 0, EZERO_PRICE);
-
         // Ensure the TWAP delay has finished.
         let delay_threshold = oracle.market_start_time + oracle.twap_start_delay;
         if (timestamp < delay_threshold) {
