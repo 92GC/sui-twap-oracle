@@ -4,7 +4,7 @@
 This project is licensed under the [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.txt).
 
 ## How to use
-Full logic is available in ./oracle.move. For a duplicate oracle implementation with full method and test suite see ./oracle-tests/
+Full logic is available in ./oracle.move. For full test suite see ./oracle-tests/
 
 ## Alternative
 Here is an oracle implementation on Solana https://github.com/metaDAOproject/futarchy/blob/develop/programs/amm/src/state/amm.rs
