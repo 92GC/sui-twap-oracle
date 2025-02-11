@@ -185,7 +185,7 @@ module futarchy::oracle {
         assert!(period > 0, EZERO_PERIOD);
         
         // Calculate and validate TWAP
-        // Multiply by BASIS_POINTS again to preserve precision
+        // Multiply by BASIS_POINTS to preserve precision
         let twap = (oracle.total_cumulative_price * (BASIS_POINTS as u256)) / (period as u256);
         
         (twap as u64)
