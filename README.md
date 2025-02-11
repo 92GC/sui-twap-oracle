@@ -1,5 +1,8 @@
 # Sui Crankless Time Weighted Average Price (TWAP) oracle
 
+## License
+Licensed under the Business Source License (BSL) 1.1 for non-commercial use only; see the LICENSE file for details.
+
 ## How to use
 Full logic is available in ./oracle.move. For full test suite see ./oracle-tests/
 
