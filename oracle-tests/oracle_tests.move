@@ -4,15 +4,16 @@ module futarchy::oracle_tests {
     use sui::clock;
     use sui::test_scenario::{Self as test, Scenario};
     use futarchy::oracle::{Self, Oracle};
+    use std::u128;
     use std::debug;
+
 
     // ======== Test Constants ========
     const BASIS_POINTS: u64 = 10000;
     const TWAP_STEP_MAX: u64 = 1000;       // Allow 10% movement
     const TWAP_START_DELAY: u64 = 2000;
     const MARKET_START_TIME: u64 = 1000;
-    const INIT_PRICE: u64 = 10000;
-    const TWAP_UPDATE_INTERVAL: u64 = 60000; // Same as TWAP_PRICE_CAP_WINDOW_PERIOD
+    const INIT_PRICE: u128 = 10000;
     const TWAP_PRICE_CAP_WINDOW_PERIOD: u64 = 60000;
 
     // For testing extreme values, define a maximum u64 constant.
@@ -61,7 +62,7 @@ module futarchy::oracle_tests {
     #[test]
     fun test_write_observation_before_delay() {
         // When an observation is submitted before the TWAP delay, no state changes should occur.
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         {
             let ctx = test::ctx(&mut scenario);
             let mut oracle_inst = setup_test_oracle(ctx);
@@ -82,7 +83,7 @@ module futarchy::oracle_tests {
     #[test]
     fun test_write_observation_after_delay_upward_cap() {
         // When a high price is reported after the delay, it should be capped upward.
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         {
             let ctx = test::ctx(&mut scenario);
             let mut oracle_inst = setup_test_oracle(ctx);
@@ -107,7 +108,7 @@ module futarchy::oracle_tests {
     #[test]
     fun test_write_observation_after_delay_downward_cap() {
         // When a low price is reported after the delay, it should be capped downward.
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         {
             let ctx = test::ctx(&mut scenario);
             let mut oracle_inst = setup_test_oracle(ctx);
@@ -130,7 +131,7 @@ module futarchy::oracle_tests {
     #[expected_failure(abort_code = futarchy::oracle::ETIMESTAMP_REGRESSION)]
     fun test_timestamp_regression() {
         // An observation with a timestamp earlier than the previous one should abort.
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         {
             let ctx = test::ctx(&mut scenario);
             let mut oracle_inst = setup_test_oracle(ctx);
@@ -169,13 +170,12 @@ module futarchy::oracle_tests {
     #[test]
     fun test_getters() {
         // Verify that all getters return the expected initial configuration.
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         {
             let ctx = test::ctx(&mut scenario);
             let oracle_inst = setup_test_oracle(ctx);
             assert!(oracle::get_last_price(&oracle_inst) == INIT_PRICE, 0);
             assert!(oracle::get_last_timestamp(&oracle_inst) == MARKET_START_TIME, 1);
-            let ( delay, step) = oracle::get_config(&oracle_inst);
             assert!(oracle::get_market_start_time(&oracle_inst) == MARKET_START_TIME, 4);
             assert!(oracle::get_twap_initialization_price(&oracle_inst) == INIT_PRICE, 5);
             oracle::destroy_for_testing(oracle_inst);
@@ -188,7 +188,7 @@ module futarchy::oracle_tests {
     fun test_write_observation_no_time_progress() {
         // Verify that when an observation is submitted with no time progression,
         // no cumulative update or price change occurs.
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         {
             let ctx = test::ctx(&mut scenario);
             let mut oracle_inst = setup_test_oracle(ctx);
@@ -214,7 +214,7 @@ module futarchy::oracle_tests {
     #[test]
     fun test_multiple_write_observations_consistency() {
          // Verify that sequential observations accumulate the cumulative price as expected.
-         let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+         let (mut scenario, clock_inst) = setup_scenario_and_clock();
          {
              let ctx = test::ctx(&mut scenario);
              let mut oracle_inst = setup_test_oracle(ctx);
@@ -255,7 +255,7 @@ module futarchy::oracle_tests {
     #[test]
     fun test_twap_drift_towards_observation_price() {
         // Use the same constants as in other tests.
-        let target_price: u64 = 20000;
+        let target_price: u128 = 20000;
         let delay_threshold = MARKET_START_TIME + TWAP_START_DELAY; // For example, 1000+2000 = 3000.
         
         let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
@@ -289,7 +289,7 @@ module futarchy::oracle_tests {
             // --- Final long-duration observation ---
             // Simulate a long period during which the new target price is maintained.
             // This adds a dominant contribution at the target price.
-            let final_obs_time = fifth_obs_time + 500000; // A long interval after the last observation.
+            let final_obs_time = fifth_obs_time + 5000000; // A long interval after the last observation.
             oracle::write_observation(&mut oracle_inst, final_obs_time, target_price);
 
             // Set the testing clock to the time of the final observation.
@@ -300,6 +300,7 @@ module futarchy::oracle_tests {
             // Because the long final interval adds significant weight at 'target_price',
             // the overall TWAP should have drifted close to target_price.
             // Allow a small tolerance (e.g. TWAP >= 19000) to account for earlier lower values.
+
             assert!(twap >= 19000, 0);
 
             oracle::destroy_for_testing(oracle_inst);
@@ -323,15 +324,15 @@ module futarchy::oracle_tests {
         let mut scenario = test::begin(@0x1);
         test::next_tx(&mut scenario, @0x1);
         let ctx = test::ctx(&mut scenario);
-        let mut extreme_oracle = oracle::new_oracle(U64_MAX, 0, 0, U64_MAX, ctx);
+        let mut extreme_oracle = oracle::new_oracle(u128::max_value!(), 0, 0, U64_MAX, ctx);
 
         // First observation: timestamp = U64_MAX / 2.
         let half_max: u64 = U64_MAX / 2;
-        oracle::write_observation(&mut extreme_oracle, half_max, U64_MAX);
+        oracle::write_observation(&mut extreme_oracle, half_max, u128::max_value!());
 
         // Second observation: timestamp = U64_MAX.
         // This second call pushes the cumulative price beyond u256's capacity.
-        oracle::write_observation(&mut extreme_oracle, U64_MAX, U64_MAX);
+        oracle::write_observation(&mut extreme_oracle, U64_MAX, u128::max_value!());
 
         // The overflow is expected before reaching this point.
         oracle::destroy_for_testing(extreme_oracle);
@@ -344,7 +345,7 @@ module futarchy::oracle_tests {
     // and at exactly one full TWAP window after that.
     #[test]
     fun test_exact_full_window_boundary() {
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         let ctx = test::ctx(&mut scenario);
         let mut oracle_inst = setup_test_oracle(ctx);
         let delay_threshold: u64 = MARKET_START_TIME + TWAP_START_DELAY; // e.g., 1000+2000 = 3000
@@ -358,7 +359,7 @@ module futarchy::oracle_tests {
         // Observation exactly at delay_threshold + TWAP_PRICE_CAP_WINDOW_PERIOD.
         let obs_time: u64 = delay_threshold + TWAP_PRICE_CAP_WINDOW_PERIOD; // 3000 + 60000 = 63000
         oracle::write_observation(&mut oracle_inst, obs_time, 15000);
-        let (last_price, ts2, cumulative2) = oracle::debug_get_state(&oracle_inst);
+        let (_last_price, ts2, cumulative2) = oracle::debug_get_state(&oracle_inst);
         assert!(ts2 == obs_time, 2);
         // For observations after a full window, the allowed change increases:
         // full_windows_since_last_update = 1, so steps = 2, and allowed change becomes 2000.
@@ -376,7 +377,7 @@ module futarchy::oracle_tests {
     // Verifies that multiple observations with the same timestamp do not update the state.
     #[test]
     fun test_identical_timestamps_no_update() {
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         let ctx = test::ctx(&mut scenario);
         let mut oracle_inst = setup_test_oracle(ctx);
         let delay_threshold: u64 = MARKET_START_TIME + TWAP_START_DELAY; // 3000
@@ -425,8 +426,9 @@ module futarchy::oracle_tests {
             // Total cumulative = 5,500,000 + 58,500,000 + 18,000,000 = 82,000,000.
             // Effective period = (12000 - 1000) - 2000 = 9000.
             // TWAP = (82,000,000 * 10000) / 9000.
-            let expected_twap = (82_000_000u256 * 10000u256) / 9000u256;
+            let expected_twap = (8200u256 * 10000u256) / 9000u256;
             let twap = oracle::get_twap(&oracle_inst, &clock_inst);
+
             assert!((twap as u256) == expected_twap, 0);
             oracle::destroy_for_testing(oracle_inst);
             clock::destroy_for_testing(clock_inst);
@@ -475,7 +477,7 @@ module futarchy::oracle_tests {
         clock::set_for_testing(&mut clock_inst, delay_threshold + 10);
         let period: u64 = ((delay_threshold + 10) - MARKET_START_TIME) - TWAP_START_DELAY;
         let twap = oracle::get_twap(&oracle_inst, &clock_inst);
-        let expected_twap = (100000u256 * 10000u256) / (period as u256);
+        let expected_twap = 100000u256 / (period as u256);
         assert!((twap as u256) == expected_twap, 3);
         oracle::destroy_for_testing(oracle_inst);
         clock::destroy_for_testing(clock_inst);
@@ -497,9 +499,9 @@ module futarchy::oracle_tests {
         // Refresh observation at fixed_time.
         let last_price = oracle::get_last_price(&oracle_inst);
         oracle::write_observation(&mut oracle_inst, fixed_time, last_price);
-        let twap1: u64 = oracle::get_twap(&oracle_inst, &clock_inst);
-        let twap2: u64 = oracle::get_twap(&oracle_inst, &clock_inst);
-        let twap3: u64 = oracle::get_twap(&oracle_inst, &clock_inst);
+        let twap1: u128 = oracle::get_twap(&oracle_inst, &clock_inst);
+        let twap2: u128 = oracle::get_twap(&oracle_inst, &clock_inst);
+        let twap3: u128 = oracle::get_twap(&oracle_inst, &clock_inst);
         assert!(twap1 == twap2, 0);
         assert!(twap2 == twap3, 1);
         oracle::destroy_for_testing(oracle_inst);
@@ -553,9 +555,10 @@ module futarchy::oracle_tests {
 
         // Effective period: (current_time - market_start_time) = 2000 - 1000 = 1000.
         let period = (second_obs_time - MARKET_START_TIME) as u256;
-        let expected_twap_final = (total_cumulative * (BASIS_POINTS as u256)) / period;
+        let expected_twap_final = total_cumulative / period;
 
         // Validate that the computed TWAP matches the expected value.
+
         assert!((twap as u256) == expected_twap_final, 3);
 
         oracle::destroy_for_testing(oracle_inst);

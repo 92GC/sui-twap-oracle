@@ -11,12 +11,8 @@ module futarchy::oracle_price_cap_tests {
     const TWAP_STEP_MAX: u64 = 1000;       // Allow 10% movement
     const TWAP_START_DELAY: u64 = 2000;
     const MARKET_START_TIME: u64 = 1000;
-    const INIT_PRICE: u64 = 10000;
-    const TWAP_UPDATE_INTERVAL: u64 = 60000; // Same as TWAP_PRICE_CAP_WINDOW_PERIOD
+    const INIT_PRICE: u128 = 10000;
     const TWAP_PRICE_CAP_WINDOW_PERIOD: u64 = 60000;
-
-    // For testing extreme values, define a maximum u64 constant.
-    const U64_MAX: u64 = 18446744073709551615;
 
     // ======== Helper Functions ========
     fun setup_test_oracle(ctx: &mut TxContext): Oracle {
@@ -40,7 +36,7 @@ module futarchy::oracle_price_cap_tests {
 
     #[test]
     fun test_price_capping_basic_scenarios() {
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         {
             let ctx = test::ctx(&mut scenario);
             let mut oracle_inst = setup_test_oracle(ctx);
@@ -75,7 +71,7 @@ module futarchy::oracle_price_cap_tests {
 
     #[test]
     fun test_price_capping_multi_window() {
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         {
             let ctx = test::ctx(&mut scenario);
             let mut oracle_inst = setup_test_oracle(ctx);
@@ -112,7 +108,7 @@ module futarchy::oracle_price_cap_tests {
 
     #[test]
     fun test_price_capping_edge_cases() {
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         {
             let ctx = test::ctx(&mut scenario);
             let mut oracle_inst = setup_test_oracle(ctx);
@@ -127,7 +123,7 @@ module futarchy::oracle_price_cap_tests {
             assert!(oracle::get_last_price(&oracle_inst) == INIT_PRICE + 1, 1);
             
             // Test case 3: Exactly at cap limit
-            let exact_cap_price = INIT_PRICE + (INIT_PRICE * TWAP_STEP_MAX) / BASIS_POINTS;
+            let exact_cap_price = INIT_PRICE + (INIT_PRICE * (TWAP_STEP_MAX as u128)) / (BASIS_POINTS as u128);
             oracle::write_observation(&mut oracle_inst, delay_threshold + 300, exact_cap_price);
             assert!(oracle::get_last_price(&oracle_inst) == exact_cap_price, 2);
 
@@ -139,7 +135,7 @@ module futarchy::oracle_price_cap_tests {
 
     #[test]
     fun test_price_capping_rapid_reversals() {
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         {
             let ctx = test::ctx(&mut scenario);
             let mut oracle_inst = setup_test_oracle(ctx);
@@ -189,7 +185,7 @@ module futarchy::oracle_price_cap_tests {
 
     #[test]
     fun test_price_capping_long_term_trend() {
-        let (mut scenario, mut clock_inst) = setup_scenario_and_clock();
+        let (mut scenario, clock_inst) = setup_scenario_and_clock();
         {
             let ctx = test::ctx(&mut scenario);
             let mut oracle_inst = setup_test_oracle(ctx);

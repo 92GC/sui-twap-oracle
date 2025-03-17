@@ -1,38 +1,53 @@
 module futarchy::oracle {
+    /// # Crankless Time Weighted Average Price (TWAP) Oracle
     use sui::clock::{Self, Clock};
+    use std::debug;
+    use std::u128;
+    use futarchy::math;
+    // ======== Safe Usage =========
+    // Max twap accumulation is U256 Max ≈1.16 x 10^77
+    // Worst-case TWAP daily accumulation:
+    // Scale factor (10,000) * Milliseconds a day (7x 24×3,600×1,000) * max price observation (?)
+
+    // ===== Future Changes To Consider =====
+    // Update once a window instead of every sui checkpoint?
+    // Let TWAP adjust to fair market price during TWAP delay period and then reset accumulation when delay period ends.
 
     // ========== Constants =========
-    const BASIS_POINTS: u64 = 10_000;
-    const TWAP_PRICE_CAP_WINDOW: u64 = 60_000; // 60 seconds in milliseconds 
+    /// Basis points scalar (10,000 = 100%)
+    /// Used for scaling max price step correctly. Allows for minimum TWAP max step of 0.01%,
+    /// which over 12 hours equates to maximum growth of 7.47%.
+    const BASIS_POINTS: u64 = 10_000;  
+    const TWAP_PRICE_CAP_WINDOW: u64 = 60_000; // 60 seconds in milliseconds
+    const ONE_WEEK_MS: u64 = 604_800_000;
 
     // ======== Error Constants ========
-    const ETIMESTAMP_REGRESSION: u64 = 0;
-    const ETWAP_NOT_STARTED: u64 = 1;
-    const EZERO_PERIOD: u64 = 2;
-    const EZERO_PRICE: u64 = 3;
-    const EZERO_INITIALIZATION: u64 = 4;
-    const EZERO_STEP: u64 = 5;
-    const ELONG_DELAY: u64 = 6;
-    const ESTALE_TWAP: u64 = 7;
+    const ETWAP_NOT_STARTED: u64 = 201;
+    const EZERO_PERIOD: u64 = 202;
+    const EZERO_INITIALIZATION: u64 = 203;
+    const EZERO_STEP: u64 = 204;
+    const ELONG_DELAY: u64 = 205;
+    const ESTALE_TWAP: u64 = 206;
+    const ETIMESTAMP_REGRESSION: u64 = 200;
     
     // ======== Configuration Struct ========
     public struct Oracle has key, store {
         id: UID,
-        last_price: u64,
+        last_price: u128,
         last_timestamp: u64,
         total_cumulative_price: u256, // TWAP calculation fields - using u256 for overflow protection
         last_window_end_cumulative_price: u256,
         last_window_end: u64,
-        last_window_twap: u64,
+        last_window_twap: u128,
         twap_start_delay: u64, // Reduces attacker advantage with surprise proposals
         max_bps_per_step: u64,  // Maximum relative step size for TWAP calculations
         market_start_time: u64,
-        twap_initialization_price: u64
+        twap_initialization_price: u128
     }
 
     // ======== Constructor ========
     public(package) fun new_oracle(
-        twap_initialization_price: u64,
+        twap_initialization_price: u128,
         market_start_time: u64,
         twap_start_delay: u64,
         max_bps_per_step: u64,
@@ -40,7 +55,7 @@ module futarchy::oracle {
     ): Oracle {
         assert!(twap_initialization_price > 0, EZERO_INITIALIZATION);
         assert!(max_bps_per_step > 0, EZERO_STEP);
-        assert!(twap_start_delay < 604_800_000, ELONG_DELAY); // One week in milliseconds
+        assert!(twap_start_delay < ONE_WEEK_MS, ELONG_DELAY); // One week in milliseconds
         
         let oracle = Oracle {
             id: object::new(ctx), // Create a unique ID for the oracle
@@ -61,42 +76,31 @@ module futarchy::oracle {
 
     // ======== Helper Functions ========
     // Cap TWAP accumalation price against previous windows to stop an attacker moving it quickly
-    fun cap_price_change(twap_base: u64, new_price: u64, max_bps_per_step: u64, full_windows_since_last_update: u64): u64 {
+    fun cap_price_change(twap_base: u128, new_price: u128, max_bps_per_step: u64, full_windows_since_last_update: u64): u128 {
         // Calculate maximum allowed price movement as a percentage of base price
         // max_bps_per_step is in basis points (e.g., 1000 = 10%)
         let steps = full_windows_since_last_update + 1;
 
         // Basis points can't be 0, see calculate_decimal_scale_factor in maths module
-        let computed = (twap_base * max_bps_per_step * steps) / BASIS_POINTS;
+        let unsafe_max_change = (((twap_base as u256) * (max_bps_per_step as u256) * (steps as u256)) / (BASIS_POINTS as u256)) as u128;
         // Ensure cap is not 0
-        let max_change = if (computed < 1) { 1 } else { computed };
+        let max_change = if (unsafe_max_change < 1) { 1 } else { unsafe_max_change };
 
-        // Cap upward movement
-        let result = if (new_price > twap_base) {
-            if (new_price - twap_base > max_change) {
-                twap_base + max_change
-            } else {
-                new_price
-            }
-            
-            // Cap downward movement
-            } else {
-                if (twap_base - new_price > max_change) {
-                    twap_base - max_change
-                } else {
-                    new_price
-                }
-        };
-
-        result
+        if (new_price > twap_base) {
+            // Cap upward movement: min(new_price, saturating_add(twap_base, max_change))
+            u128::min(new_price, math::saturating_add(twap_base, max_change))
+        } else {
+            // Cap downward movement: max(new_price, saturating_sub(twap_base, max_change))
+            u128::max(new_price, math::saturating_sub(twap_base, max_change))
+        }
     }
 
-    fun calculate_last_window_twap(oracle: &Oracle, full_windows_since_last_update: u64): u64 {
+    fun calculate_last_window_twap(oracle: &Oracle, full_windows_since_last_update: u64): u128 {
         let current_window_price_accumulation = oracle.total_cumulative_price - oracle.last_window_end_cumulative_price;
 
         let time_elapsed = (TWAP_PRICE_CAP_WINDOW as u256) * (full_windows_since_last_update as u256);
         let last_window_twap = current_window_price_accumulation / time_elapsed;
-        (last_window_twap as u64)
+        (last_window_twap as u128)
     }
 
     // ======== Core Functions ========
@@ -104,7 +108,7 @@ module futarchy::oracle {
     public(package) fun write_observation(
         oracle: &mut Oracle,
         timestamp: u64,
-        price: u64,
+        price: u128,
     ) {
 
         // Sanity time checks
@@ -167,7 +171,8 @@ module futarchy::oracle {
         }
     }
 
-    public(package) fun get_twap(oracle: &Oracle, clock: &Clock): u64 {
+
+    public(package) fun get_twap(oracle: &Oracle, clock: &Clock): u128 {
         let current_time = clock::timestamp_ms(clock);
 
         // TWAP is only allowed to be read in the same instance, after a write has occured
@@ -185,9 +190,92 @@ module futarchy::oracle {
         assert!(period > 0, EZERO_PERIOD);
         
         // Calculate and validate TWAP
-        // Multiply by BASIS_POINTS to preserve precision
-        let twap = (oracle.total_cumulative_price * (BASIS_POINTS as u256)) / (period as u256);
+        let twap = (oracle.total_cumulative_price) / (period as u256);
         
-        (twap as u64)
+        (twap as u128)
     }
+
+    // ======== Validation Functions ========
+    public fun is_twap_valid(oracle: &Oracle, min_period: u64, clock: &Clock): bool {
+        let current_time = clock::timestamp_ms(clock);
+        current_time >= oracle.last_timestamp + min_period
+    }
+
+    // ======== Getters ========
+    public fun get_last_price(oracle: &Oracle): u128 {
+        oracle.last_price
+    }
+
+    public fun get_last_timestamp(oracle: &Oracle): u64 {
+        oracle.last_timestamp
+    }
+    
+    public fun get_config(oracle: &Oracle): (u64, u64) {
+        (
+            oracle.twap_start_delay,
+            oracle.max_bps_per_step
+        )
+    }
+
+    public fun get_market_start_time(oracle: &Oracle): u64 {
+        oracle.market_start_time  // Access through config
+    }
+
+    public fun get_twap_initialization_price(oracle: &Oracle): u128 {
+        oracle.twap_initialization_price  // Access through config
+    }
+
+    public fun get_id(o: &Oracle): &UID {
+        &o.id
+    }
+
+   // ======== Testing Helpers ========
+
+    #[test_only]
+    public fun debug_print_state(oracle: &Oracle) {
+        debug::print(&b"Oracle State:");
+        debug::print(&oracle.last_price);
+        debug::print(&oracle.last_timestamp);
+        debug::print(&oracle.total_cumulative_price);
+    }
+
+    #[test_only]
+    public fun debug_get_state(oracle: &Oracle): (u128, u64, u256) {
+        (oracle.last_price, oracle.last_timestamp, oracle.total_cumulative_price)
+    }
+
+    #[test_only]
+    public fun test_oracle(ctx: &mut TxContext): Oracle {
+        new_oracle(
+            10000, // twap_initialization_price 
+            0,     // market_start_time
+            2000,  // twap_start_delay
+            1000,  // max_bps_per_step
+            ctx    // sixth argument (TxContext)
+        )
+    }
+
+    #[test_only]
+    public fun destroy_for_testing(oracle: Oracle) {
+        let Oracle {
+            id,
+            last_price: _,
+            last_timestamp: _,
+            total_cumulative_price: _,
+            last_window_end: _,
+            last_window_end_cumulative_price: _,
+            last_window_twap: _,
+            twap_start_delay: _,
+            max_bps_per_step: _,
+            market_start_time: _,
+            twap_initialization_price: _,
+        } = oracle;
+        object::delete(id);
+    }
+
+    #[test_only]
+    public fun debug_get_window_twap(oracle: &Oracle): u128 {
+        oracle.last_window_twap
+    }
+    
 }
