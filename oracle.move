@@ -4,20 +4,12 @@ module futarchy::oracle {
     use std::debug;
     use std::u128;
     use futarchy::math;
-    // ======== Safe Usage =========
-    // Max twap accumulation is U256 Max ≈1.16 x 10^77
-    // Worst-case TWAP daily accumulation:
-    // Scale factor (10,000) * Milliseconds a day (7x 24×3,600×1,000) * max price observation (?)
-
-    // ===== Future Changes To Consider =====
-    // Update once a window instead of every sui checkpoint?
-    // Let TWAP adjust to fair market price during TWAP delay period and then reset accumulation when delay period ends.
 
     // ========== Constants =========
+    const BASIS_POINTS: u64 = 10_000;  
     /// Basis points scalar (10,000 = 100%)
     /// Used for scaling max price step correctly. Allows for minimum TWAP max step of 0.01%,
-    /// which over 12 hours equates to maximum growth of 7.47%.
-    const BASIS_POINTS: u64 = 10_000;  
+    /// which over 12 hours equates to a maximum growth of 7.47%.
     const TWAP_PRICE_CAP_WINDOW: u64 = 60_000; // 60 seconds in milliseconds
     const ONE_WEEK_MS: u64 = 604_800_000;
 
@@ -35,12 +27,20 @@ module futarchy::oracle {
         id: UID,
         last_price: u128,
         last_timestamp: u64,
-        total_cumulative_price: u256, // TWAP calculation fields - using u256 for overflow protection
+        total_cumulative_price: u256, 
+        // TWAP calculation fields - using u256 for overflow protection
+        // Max TWAP accumulation is U256 Max ≈1.16 x 10^77
+        // Max TWAP daily accumulation:
+        //     Max price observation = u64::max_value!() x 1_000_000_000_000;
+        //     Milliseconds a day (7 x 24 × 3,600 × 1,000) * max price observation
+        //     Allows for 1.04×10 ^ 37 days of accumulation. 
         last_window_end_cumulative_price: u256,
         last_window_end: u64,
         last_window_twap: u128,
-        twap_start_delay: u64, // Reduces attacker advantage with surprise proposals
-        max_bps_per_step: u64,  // Maximum relative step size for TWAP calculations
+        twap_start_delay: u64, 
+        // Reduces attacker advantage with surprise proposals
+        max_bps_per_step: u64,  
+        // Maximum relative step size for TWAP calculations
         market_start_time: u64,
         twap_initialization_price: u128
     }
