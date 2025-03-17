@@ -20,7 +20,7 @@ module futarchy::oracle {
     const EZERO_STEP: u64 = 204;
     const ELONG_DELAY: u64 = 205;
     const ESTALE_TWAP: u64 = 206;
-    const ETIMESTAMP_REGRESSION: u64 = 200;
+    const ETIMESTAMP_REGRESSION: u64 = 207;
     
     // ======== Configuration Struct ========
     public struct Oracle has key, store {
